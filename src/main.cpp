@@ -17,9 +17,19 @@
 GLuint g_windowW = 800;
 GLuint g_windowH = 800;
 
+struct NoiseData
+{
+	GLuint type; //0 = perlin, 1 = worly
+	float seed;
+
+	float startFreq;
+	GLuint octaves;
+};
+
 //--------------------------------------------------------------------------------------------------------------------------------//
 //UTILITY FUNCTIONS:
 
+void render_noise_ui(NoiseData* data);
 int compile_shader(const char* path, GLenum type);
 
 //--------------------------------------------------------------------------------------------------------------------------------//
@@ -183,11 +193,9 @@ int main()
 
 	//generate texture:
 	//---------------------------------
-	GLuint textureW = 128;
-	GLuint textureH = 128;
+	GLuint textureSize = 128;
 
-	GLuint lastTextureW = textureW; //for determining if texture needs to be resized
-	GLuint lastTextureH = textureH;
+	GLuint lastTextureSize = textureSize; //for determining if texture needs to be resized
 
 	GLuint noiseTexture;
 	glGenTextures(1, &noiseTexture);
@@ -196,7 +204,34 @@ int main()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, textureW, textureH, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, textureSize, textureSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+
+	//generate data buffer:
+	//---------------------------------
+	GLuint noiseDataBuffer;
+	glGenBuffers(1, &noiseDataBuffer);
+	glBindBuffer(GL_UNIFORM_BUFFER, noiseDataBuffer);
+	glBufferData(GL_UNIFORM_BUFFER, sizeof(NoiseData) * 8, NULL, GL_DYNAMIC_DRAW);
+
+	//parameter declarations:
+	//---------------------------------	
+	GLint channelView = 0;
+	bool grayscaleChannel = true;
+
+	const char* channelNames[5] = {"R", "G", "B", "A", "ALL"};
+
+	NoiseData noiseData[8];
+	noiseData[0] = {0, 0.0f, 4.0f, 16};
+	noiseData[1] = {0, 1.0f, 4.0f, 16};
+	noiseData[2] = {0, 2.0f, 4.0f, 16};
+	noiseData[3] = {0, 3.0f, 4.0f, 16};
+	noiseData[4] = {1, 0.0f, 4.0f, 16};
+	noiseData[5] = {1, 1.0f, 4.0f, 16};
+	noiseData[6] = {1, 2.0f, 4.0f, 16};
+	noiseData[7] = {1, 3.0f, 4.0f, 16};
+
+	GLuint combineType = 0;
+	float displacementScale = 1.0f;
 
 	//main loop:
 	//---------------------------------
@@ -209,25 +244,38 @@ int main()
 		float deltaTime = currentTime - lastFrame;
 		lastFrame = currentTime;
 
+		//clear
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		//send noise data:
+		glBindBuffer(GL_UNIFORM_BUFFER, noiseDataBuffer);
+		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(NoiseData) * 8, noiseData);
+
 		//dispatch compute shader:
 		glUseProgram(noiseProgram);
 
+		glUniform1ui(glGetUniformLocation(noiseProgram, "combineType"), combineType);
+		glUniform1f(glGetUniformLocation(noiseProgram, "displacementScale"), displacementScale);
 		glBindImageTexture(0, noiseTexture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-		
-		glDispatchCompute((GLuint)ceilf((float)textureW / WORK_GROUP_SIZE), (GLuint)ceilf((float)textureH / WORK_GROUP_SIZE), 1);
+		glBindBufferBase(GL_UNIFORM_BUFFER, 0, noiseDataBuffer);
+
+		GLuint numWorkGroups = (GLuint)ceilf((float)textureSize / WORK_GROUP_SIZE);
+		glDispatchCompute(numWorkGroups, numWorkGroups, 1);
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
 		//run final quad shader:
 		float screenAspect = (float)g_windowW / g_windowH;
-		float textureAspect = (float)textureW / textureH;
 
 		float scale[2];
-		scale[0] = screenAspect > textureAspect ? textureAspect / screenAspect : 1.0f;
-		scale[1] = screenAspect < textureAspect ? screenAspect / textureAspect : 1.0f;
+		scale[0] = screenAspect > 1.0f ? 1.0f / screenAspect : 1.0f;
+		scale[1] = screenAspect < 1.0f ? screenAspect / 1.0f : 1.0f;
 
 		glUseProgram(quadProgram);
 
 		glUniform2fv(glGetUniformLocation(quadProgram, "scale"), 1, scale);
+		glUniform1i(glGetUniformLocation(quadProgram, "channel"), channelView);
+		glUniform1ui(glGetUniformLocation(quadProgram, "grayscale"), (GLboolean)grayscaleChannel);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, noiseTexture);
 
@@ -238,19 +286,28 @@ int main()
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
 
-		//...
+		ImGui::Begin("Texture Settings");
+
+		ImGui::SetNextItemWidth(ImGui::GetWindowSize().x * 0.25f);
+		ImGui::Combo("Channel", &channelView, channelNames, 5);
+		ImGui::SameLine();
+		ImGui::Checkbox("Grayscale", &grayscaleChannel);
+
+		ImGui::End();
+
+		if(channelView < 4)
+			render_noise_ui(&noiseData[channelView]);
 
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 		//resize texture if needed:
-		if(textureW != lastTextureW || textureH != lastTextureH)
+		if(textureSize != lastTextureSize)
 		{
 			glBindTexture(GL_TEXTURE_2D, noiseTexture);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, textureW, textureH, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, textureSize, textureSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
-			lastTextureW = textureW;
-			lastTextureH = textureH;
+			lastTextureSize = textureSize;
 		}
 
 		//swap buffers and poll events:
@@ -259,6 +316,7 @@ int main()
 	}
 
 	//clean up and return:
+	glDeleteTextures(1, &noiseTexture);
 	glDeleteVertexArrays(1, &quadVAO);
 	glDeleteProgram(quadProgram);
 	glDeleteProgram(noiseProgram);
@@ -268,6 +326,25 @@ int main()
 }
 
 //--------------------------------------------------------------------------------------------------------------------------------//
+
+void render_noise_ui(NoiseData* data)
+{
+	ImGui::Begin("Noise Settings");
+
+	const char* noiseNames[2] = {"Perlin", "Worly"};
+	ImGui::Combo("Noise Type", (int*)&data->type, noiseNames, 2);	
+	
+	ImGui::InputFloat("Seed", &data->seed);
+
+	const char* freqNames[7] = {"1", "2", "4", "8", "16", "32", "64"};
+	int selectedFreq = (int)log2f(data->startFreq);
+	ImGui::Combo("Base Frequency", &selectedFreq, freqNames, 7);
+	data->startFreq = powf(2.0f, (float)selectedFreq);
+
+	ImGui::SliderInt("Octaves", (int*)&data->octaves, 1, 64);
+
+	ImGui::End();
+}
 
 int compile_shader(const char* path, GLenum type)
 {

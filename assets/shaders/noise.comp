@@ -2,6 +2,109 @@
 layout(local_size_x = 16, local_size_y = 16) in;
 layout(rgba32f, binding = 0) uniform image2D outImage;
 
+//--------------------------------------------------------------------------------------------------------------------------------//
+
+struct NoiseData
+{
+    uint type; //0 = perlin, 1 = worly
+    float seed;
+
+    float startFreq;
+    int octaves;
+};
+
+layout(std140, binding = 0) uniform NoiseDataBuffer
+{
+    NoiseData primaryR;
+    NoiseData primaryG;
+    NoiseData primaryB;
+    NoiseData primaryA;
+
+    NoiseData secondaryR;
+    NoiseData secondaryG;
+    NoiseData secondaryB;
+    NoiseData secondaryA;
+};
+
+uniform uint combineType; //0 = no secondary noise, 1 = mult, 2 = average, 3 = displace
+uniform float displacementScale;
+
+//--------------------------------------------------------------------------------------------------------------------------------//
+//NOISE FUNCTIONS:
+
+float rand(vec2 p)
+{
+    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+float rand(vec2 p, float seed)
+{
+    return rand(vec2(rand(p), seed));
+}
+
+float perlin(vec2 p, float scale, float seed)
+{
+    float cellSize = 1.0 / scale;
+
+    vec2 cellPos = floor(p / cellSize);
+    vec2 localPos = mod(p, cellSize) / cellSize;
+    localPos = 3.0 * localPos * localPos - 2.0 * localPos * localPos * localPos;
+
+    float bl = rand(mod(cellPos + vec2(0.0, 0.0), scale), seed);
+    float br = rand(mod(cellPos + vec2(1.0, 0.0), scale), seed);
+    float tl = rand(mod(cellPos + vec2(0.0, 1.0), scale), seed);
+    float tr = rand(mod(cellPos + vec2(1.0, 1.0), scale), seed);
+
+    float bot = mix(bl, br, localPos.x);
+    float top = mix(tl, tr, localPos.x);
+
+    return mix(bot, top, localPos.y);
+}
+
+//--------------------------------------------------------------------------------------------------------------------------------//
+//UTILITY FUNCTIONS:
+
+float fbm(vec2 p, uint noiseType, float seed, float startFreq, uint octaves)
+{
+    float freq = startFreq;
+    float amp = 1.0;
+    float mag = 0.0;
+
+    float noise = 0.0;
+    for(int i = 0; i < octaves; i++)
+    {
+        float n;
+        switch(noiseType)
+        {
+        case 0:
+            n = perlin(p, freq, seed);
+            break;
+        default:
+            n = 0.0;
+            break;
+        }
+
+        noise += amp * n;
+        mag += amp;
+        freq *= 2.0;
+        amp *= 0.5;
+    }
+
+    return noise / mag;
+}
+
+float noise_val(vec2 p, NoiseData data)
+{
+    return fbm(p, data.type, data.seed, data.startFreq, data.octaves);
+}
+
+vec4 noise_tex(vec2 p, NoiseData r, NoiseData g, NoiseData b, NoiseData a)
+{
+    return vec4(noise_val(p, r), noise_val(p, g), noise_val(p, b), noise_val(p, a));
+}
+
+//--------------------------------------------------------------------------------------------------------------------------------//
+
 void main()
 {
     ivec2 texSize = imageSize(outImage);
@@ -9,8 +112,24 @@ void main()
     if(texPos.x >= texSize.x || texPos.y >= texSize.y)
         return;
 
+    vec4 finalCol;
+
     vec2 uv = vec2(texPos) / vec2(texSize);
+    vec4 primaryCol = noise_tex(uv, primaryR, primaryG, primaryB, primaryA);
+
+    if(combineType != 0)
+    {
+        vec4 secondaryCol = noise_tex(uv, secondaryR, secondaryG, secondaryB, secondaryA);
+        switch(combineType)
+        {
+        default:
+            finalCol = primaryCol;
+            break;
+        }
+    }
+    else
+        finalCol = primaryCol;
 
     //store final color:
-    imageStore(outImage, ivec2(texPos), vec4(uv, 0.5, 1.0));
+    imageStore(outImage, ivec2(texPos), finalCol);
 }
