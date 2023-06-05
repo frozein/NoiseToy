@@ -20,14 +20,13 @@ layout(std140, binding = 0) uniform NoiseDataBuffer
     NoiseData primaryB;
     NoiseData primaryA;
 
-    NoiseData secondaryR;
-    NoiseData secondaryG;
-    NoiseData secondaryB;
-    NoiseData secondaryA;
+    NoiseData layeredR;
+    NoiseData layeredG;
+    NoiseData layeredB;
+    NoiseData layeredA;
 };
 
-uniform uint combineType; //0 = no secondary noise, 1 = mult, 2 = average, 3 = displace
-uniform float displacementScale;
+uniform uint layeringType; //0 = no secondary noise, 1 = mult, 2 = average
 
 //--------------------------------------------------------------------------------------------------------------------------------//
 //NOISE FUNCTIONS:
@@ -151,23 +150,26 @@ void main()
     if(texPos.x >= texSize.x || texPos.y >= texSize.y)
         return;
 
-    vec4 finalCol;
-
     vec2 uv = vec2(texPos) / vec2(texSize);
     vec4 primaryCol = noise_tex(uv, primaryR, primaryG, primaryB, primaryA);
+    vec4 layeredCol = noise_tex(uv, layeredR, layeredG, layeredB, layeredA);
+    vec4 finalCol;
 
-    if(combineType != 0)
+    switch(layeringType)
     {
-        vec4 secondaryCol = noise_tex(uv, secondaryR, secondaryG, secondaryB, secondaryA);
-        switch(combineType)
-        {
-        default:
-            finalCol = primaryCol;
-            break;
-        }
-    }
-    else
+    case 0:
         finalCol = primaryCol;
+        break;
+    case 1:
+        finalCol = primaryCol * layeredCol;
+        break;
+    case 2:
+        finalCol = 0.5 * (primaryCol + layeredCol);
+        break;
+    default:
+        finalCol = vec4(0.0);
+        break;
+    }
 
     //store final color:
     imageStore(outImage, ivec2(texPos), finalCol);

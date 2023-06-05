@@ -29,7 +29,7 @@ struct NoiseData
 //--------------------------------------------------------------------------------------------------------------------------------//
 //UTILITY FUNCTIONS:
 
-void render_noise_ui(NoiseData* data);
+void render_noise_ui(NoiseData* data, bool primary);
 int compile_shader(const char* path, GLenum type);
 
 //--------------------------------------------------------------------------------------------------------------------------------//
@@ -218,23 +218,22 @@ int main()
 	const char* textureSizeNames[8] = {"16", "32", "64", "128", "256", "512", "1024", "2048"};
 	int selectedTextureSize = 3;
 
+	const char* channelNames[5] = {"R", "G", "B", "A", "ALL"};
 	GLint channelView = 0;
 	bool grayscaleChannel = true;
 
-	const char* channelNames[5] = {"R", "G", "B", "A", "ALL"};
+	const char* layeringNames[3] = {"No Layering", "Multiply", "Average"};
+	GLuint layeringType = 0;
 
 	NoiseData noiseData[8];
 	noiseData[0] = {0, 0.0f, 4.0f, 16};
 	noiseData[1] = {0, 1.0f, 4.0f, 16};
 	noiseData[2] = {0, 2.0f, 4.0f, 16};
 	noiseData[3] = {0, 3.0f, 4.0f, 16};
-	noiseData[4] = {1, 0.0f, 4.0f, 16};
-	noiseData[5] = {1, 1.0f, 4.0f, 16};
-	noiseData[6] = {1, 2.0f, 4.0f, 16};
-	noiseData[7] = {1, 3.0f, 4.0f, 16};
-
-	GLuint combineType = 0;
-	float displacementScale = 1.0f;
+	noiseData[4] = {0, 4.0f, 4.0f, 16};
+	noiseData[5] = {0, 5.0f, 4.0f, 16};
+	noiseData[6] = {0, 6.0f, 4.0f, 16};
+	noiseData[7] = {0, 7.0f, 4.0f, 16};
 
 	//main loop:
 	//---------------------------------
@@ -258,8 +257,7 @@ int main()
 		//dispatch compute shader:
 		glUseProgram(noiseProgram);
 
-		glUniform1ui(glGetUniformLocation(noiseProgram, "combineType"), combineType);
-		glUniform1f(glGetUniformLocation(noiseProgram, "displacementScale"), displacementScale);
+		glUniform1ui(glGetUniformLocation(noiseProgram, "layeringType"), layeringType);
 		glBindImageTexture(0, noiseTexture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 		glBindBufferBase(GL_UNIFORM_BUFFER, 0, noiseDataBuffer);
 
@@ -299,10 +297,16 @@ int main()
 		ImGui::SameLine();
 		ImGui::Checkbox("Grayscale", &grayscaleChannel);
 
+		ImGui::Combo("Layering Type", (int*)&layeringType, layeringNames, 3);
+
 		ImGui::End();
 
 		if(channelView < 4)
-			render_noise_ui(&noiseData[channelView]);
+		{
+			render_noise_ui(&noiseData[channelView], true);
+			if(layeringType > 0)
+				render_noise_ui(&noiseData[channelView + 4], false);
+		}
 
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -333,9 +337,12 @@ int main()
 
 //--------------------------------------------------------------------------------------------------------------------------------//
 
-void render_noise_ui(NoiseData* data)
+void render_noise_ui(NoiseData* data, bool primary)
 {
-	ImGui::Begin("Noise Settings");
+	if(primary)
+		ImGui::Begin("Primary Noise Settings");
+	else
+		ImGui::Begin("Layered Noise Settings");
 
 	ImGui::PushItemWidth(ImGui::GetWindowSize().x * 0.5f);
 
@@ -349,7 +356,7 @@ void render_noise_ui(NoiseData* data)
 	ImGui::Combo("Base Frequency", &selectedFreq, freqNames, 7);
 	data->startFreq = powf(2.0f, (float)selectedFreq);
 
-	ImGui::SliderInt("Octaves", (int*)&data->octaves, 1, 64);
+	ImGui::SliderInt("Octaves", (int*)&data->octaves, 1, 32);
 
 	ImGui::End();
 }
