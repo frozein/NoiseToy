@@ -1,0 +1,16 @@
+#version 430 core
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(rgba32f, binding = 0) uniform image2D outImage;
+
+void main()
+{
+    ivec2 texSize = imageSize(outImage);
+    ivec2 texPos = ivec2(gl_GlobalInvocationID.xy);
+    if(texPos.x >= texSize.x || texPos.y >= texSize.y)
+        return;
+
+    vec2 uv = vec2(texPos) / vec2(texSize);
+
+    //store final color:
+    imageStore(outImage, ivec2(texPos), vec4(uv, 0.5, 1.0));
+}
