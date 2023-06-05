@@ -6,7 +6,7 @@ layout(rgba32f, binding = 0) uniform image2D outImage;
 
 struct NoiseData
 {
-    uint type; //0 = perlin, 1 = worly
+    uint type; //0 = perlin, 1 = worly, 2 = worly inverted
     float seed;
 
     float startFreq;
@@ -42,12 +42,23 @@ float rand(vec2 p, float seed)
     return rand(vec2(rand(p), seed));
 }
 
+vec2 rand2(vec2 p)
+{
+    p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5,183.3)));
+    return fract(sin(p) * 43758.5453);
+}
+
+vec2 rand2(vec2 p, float seed)
+{
+    return rand2(vec2(rand(p), seed));
+}
+
 float perlin(vec2 p, float scale, float seed)
 {
     float cellSize = 1.0 / scale;
 
     vec2 cellPos = floor(p / cellSize);
-    vec2 localPos = mod(p, cellSize) / cellSize;
+    vec2 localPos = mod(p, cellSize) * scale;
     localPos = 3.0 * localPos * localPos - 2.0 * localPos * localPos * localPos;
 
     float bl = rand(mod(cellPos + vec2(0.0, 0.0), scale), seed);
@@ -59,6 +70,28 @@ float perlin(vec2 p, float scale, float seed)
     float top = mix(tl, tr, localPos.x);
 
     return mix(bot, top, localPos.y);
+}
+
+float worly(vec2 p, float scale, float seed)
+{
+    float cellSize = 1.0 / scale;
+
+    vec2 cellPos = floor(p / cellSize);
+    vec2 localPos = mod(p, cellSize) * scale;
+
+    float minDist = 1.0;
+    for(int i = -1; i <= 1; i++)
+        for(int j = -1; j <= 1; j++)
+        {
+            vec2 center = rand2(mod(cellPos + vec2(i, j), scale), seed);
+            center += vec2(i, j);
+
+            vec2 diff = center - localPos;
+
+            minDist = min(minDist, length(diff));
+        }
+
+    return minDist;
 }
 
 //--------------------------------------------------------------------------------------------------------------------------------//
@@ -78,6 +111,12 @@ float fbm(vec2 p, uint noiseType, float seed, float startFreq, uint octaves)
         {
         case 0:
             n = perlin(p, freq, seed);
+            break;
+        case 1:
+            n = worly(p, freq, seed);
+            break;
+        case 2:
+            n = 1.0 - worly(p, freq, seed);
             break;
         default:
             n = 0.0;

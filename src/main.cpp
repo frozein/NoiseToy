@@ -215,6 +215,9 @@ int main()
 
 	//parameter declarations:
 	//---------------------------------	
+	const char* textureSizeNames[8] = {"16", "32", "64", "128", "256", "512", "1024", "2048"};
+	int selectedTextureSize = 3;
+
 	GLint channelView = 0;
 	bool grayscaleChannel = true;
 
@@ -288,6 +291,9 @@ int main()
 
 		ImGui::Begin("Texture Settings");
 
+		ImGui::Combo("Size", &selectedTextureSize, textureSizeNames, 8);
+		textureSize = strtoul(textureSizeNames[selectedTextureSize], NULL, 10);
+
 		ImGui::SetNextItemWidth(ImGui::GetWindowSize().x * 0.25f);
 		ImGui::Combo("Channel", &channelView, channelNames, 5);
 		ImGui::SameLine();
@@ -331,10 +337,12 @@ void render_noise_ui(NoiseData* data)
 {
 	ImGui::Begin("Noise Settings");
 
-	const char* noiseNames[2] = {"Perlin", "Worly"};
-	ImGui::Combo("Noise Type", (int*)&data->type, noiseNames, 2);	
+	ImGui::PushItemWidth(ImGui::GetWindowSize().x * 0.5f);
+
+	const char* noiseNames[3] = {"Perlin", "Worly", "Worly (Inverted)"};
+	ImGui::Combo("Noise Type", (int*)&data->type, noiseNames, 3);	
 	
-	ImGui::InputFloat("Seed", &data->seed);
+	ImGui::InputFloat("Seed", &data->seed, 1.0f, 10.0f);
 
 	const char* freqNames[7] = {"1", "2", "4", "8", "16", "32", "64"};
 	int selectedFreq = (int)log2f(data->startFreq);
