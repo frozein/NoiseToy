@@ -10,6 +10,9 @@ NoiseToy is a very primitive library for dynamically generating various types of
 * Exporting (to an uncompressed mem dump)
 * 3D noise
 
+## Building
+NoiseToy depends on GLFW, GLAD, and Dear ImGui, so make sure these libraries are visible to your package manager of choice. To build, simply `cmake` in the root directory and the build files will be generated.
+
 ## Screenshots
 
 ![alt text](https://github.com/frozein/NoiseToy/blob/master/assets/screenshots/1.png)
