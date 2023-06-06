@@ -14,8 +14,8 @@
 
 #define WORK_GROUP_SIZE 8
 
-GLuint g_windowW = 800;
-GLuint g_windowH = 800;
+GLuint g_windowW = 1600;
+GLuint g_windowH = 1600;
 
 struct NoiseData
 {
@@ -270,15 +270,8 @@ int main()
 
 	//main loop:
 	//---------------------------------
-	float lastFrame = (float)glfwGetTime();
-
 	while(!glfwWindowShouldClose(window))
 	{
-		//find deltatime:
-		float currentTime = (float)glfwGetTime();
-		float deltaTime = currentTime - lastFrame;
-		lastFrame = currentTime;
-
 		//clear
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -357,6 +350,37 @@ int main()
 			ImGui::SliderFloat("Slice", &slice, 0.0f, 1.0f);
 
 		ImGui::Combo("Layering Type", (int*)&layeringType, layeringNames, 3);
+
+		if(ImGui::Button("Export"))
+		{
+			size_t size = textureSize * textureSize * 4 * sizeof(uint8_t);
+			if(is3D)
+				size *= textureSize;
+			
+			void* pixels = malloc(size);
+			if(is3D)
+			{
+				glBindTexture(GL_TEXTURE_3D, noiseTexture3D);
+				glGetTexImage(GL_TEXTURE_3D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+			}
+			else
+			{
+				glBindTexture(GL_TEXTURE_2D, noiseTexture2D);
+				glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+			}
+
+			FILE* fptr = fopen("output/out.dat", "wb");
+			if(!fptr)
+			{
+				printf("ERROR - FAILED TO OPEN OUTPUT FILE");
+				break;
+			}
+			
+			fwrite(&textureSize, sizeof(GLuint), 1, fptr);
+			fwrite(pixels, size, 1, fptr);
+			fclose(fptr);
+			free(pixels);
+		}
 
 		ImGui::End();
 
