@@ -12,5 +12,5 @@ NoiseToy is a very primitive library for dynamically generating various types of
 
 ## Screenshots
 
-![alt text](https://github.com/frozein/NoiseToy/blob/master/assets/screenshots/1.PNG)
-![alt text](https://github.com/frozein/NoiseToy/blob/master/assets/screenshots/2.PNG)
+![alt text](https://github.com/frozein/NoiseToy/blob/master/assets/screenshots/1.png)
+![alt text](https://github.com/frozein/NoiseToy/blob/master/assets/screenshots/2.png)
