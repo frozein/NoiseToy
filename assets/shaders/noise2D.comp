@@ -1,5 +1,5 @@
 #version 430 core
-layout(local_size_x = 16, local_size_y = 16) in;
+layout(local_size_x = 8, local_size_y = 8) in;
 layout(rgba32f, binding = 0) uniform image2D outImage;
 
 //--------------------------------------------------------------------------------------------------------------------------------//
@@ -43,7 +43,7 @@ float rand(vec2 p, float seed)
 
 vec2 rand2(vec2 p)
 {
-    p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5,183.3)));
+    p = vec2(dot(p, vec2(127.1621, 311.7931)), dot(p, vec2(269.5913, 183.3761)));
     return fract(sin(p) * 43758.5453);
 }
 
@@ -172,5 +172,5 @@ void main()
     }
 
     //store final color:
-    imageStore(outImage, ivec2(texPos), finalCol);
+    imageStore(outImage, texPos, finalCol);
 }
