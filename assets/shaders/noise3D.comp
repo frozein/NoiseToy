@@ -6,50 +6,80 @@ layout(rgba32f, binding = 0) uniform image3D outImage;
 
 struct NoiseData
 {
-    uint type; //0 = perlin, 1 = worly, 2 = worly inverted
-    float seed;
+	uint type; //0 = perlin, 1 = worley, 2 = worley inverted, 3 = worley box, 4 = worley box (inverted)
+	float seed;
 
-    float startFreq;
-    int octaves;
+	float startFreq;
+	int octaves;
 };
 
 layout(std140, binding = 0) uniform NoiseDataBuffer
 {
-    NoiseData primaryR;
-    NoiseData primaryG;
-    NoiseData primaryB;
-    NoiseData primaryA;
+	NoiseData primaryR;
+	NoiseData primaryG;
+	NoiseData primaryB;
+	NoiseData primaryA;
 
-    NoiseData layeredR;
-    NoiseData layeredG;
-    NoiseData layeredB;
-    NoiseData layeredA;
+	NoiseData layeredR;
+	NoiseData layeredG;
+	NoiseData layeredB;
+	NoiseData layeredA;
 };
 
 uniform uint layeringType; //0 = no secondary noise, 1 = mult, 2 = average
+
+//--------------------------------------------------------------------------------------------------------------------------------//
+//SDFs FUNCTIONS:
+
+float sdf_box(vec3 p, float l, vec3 angle)
+{
+	vec3 s = vec3(sin(angle.x), sin(angle.y), sin(angle.z));
+	vec3 c = vec3(cos(angle.x), cos(angle.y), cos(angle.z));
+	
+	mat3 rotZ = mat3(
+		c.z, -s.z, 0,
+		s.z,  c.z, 0,
+		0  ,  0  , 1
+	);
+	mat3 rotY = mat3(
+		 c.y, 0, s.y,
+		 0  , 1, 0  ,
+		-s.y, 0, c.y
+	);
+	mat3 rotX = mat3(
+		1, 0  ,  0  ,
+		0, c.x, -s.x,
+		0, s.x,  c.x
+	);
+
+	p = rotZ * rotY * rotX * p;
+
+	vec3 q = abs(p) - l;
+	return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
 
 //--------------------------------------------------------------------------------------------------------------------------------//
 //NOISE FUNCTIONS:
 
 float rand(vec2 p)
 {
-    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
 float rand(vec3 p)
 {
-    return rand(vec2(rand(p.xy), p.z));
+	return rand(vec2(rand(p.xy), p.z));
 }
 
 float rand(vec3 p, float seed)
 {
-    return rand(vec2(rand(p), seed));
+	return rand(vec2(rand(p), seed));
 }
 
 vec2 rand2(vec2 p)
 {
-    p = vec2(dot(p, vec2(127.1621, 311.7931)), dot(p, vec2(269.5913, 183.3761)));
-    return fract(sin(p) * 43758.5453);
+	p = vec2(dot(p, vec2(127.1621, 311.7931)), dot(p, vec2(269.5913, 183.3761)));
+	return fract(sin(p) * 43758.5453);
 }
 
 vec2 rand2(vec3 p)
@@ -59,13 +89,13 @@ vec2 rand2(vec3 p)
 
 vec3 rand3(vec3 p)
 {
-    p = vec3(dot(p, vec3(127.1621, 311.7931, 45.9235)), dot(p, vec3(269.5913, 183.3761, 92.3198)), dot(p, vec3(76.8126, 203.9123, 152.2284)));
-    return fract(sin(p) * 43758.5453);
+	p = vec3(dot(p, vec3(127.1621, 311.7931, 45.9235)), dot(p, vec3(269.5913, 183.3761, 92.3198)), dot(p, vec3(76.8126, 203.9123, 152.2284)));
+	return fract(sin(p) * 43758.5453);
 }
 
 vec3 rand3(vec3 p, float seed)
 {
-    return rand3(vec3(rand2(p), seed));
+	return rand3(vec3(rand2(p), seed));
 }
 
 float perlin(vec3 p, float scale, float seed)
@@ -77,13 +107,13 @@ float perlin(vec3 p, float scale, float seed)
 	localPos = 3.0 * localPos * localPos - 2.0 * localPos * localPos * localPos;
 
 	float blf = rand(mod(cellPos + vec3(0.0, 0.0, 0.0), scale), seed);
-    float brf = rand(mod(cellPos + vec3(1.0, 0.0, 0.0), scale), seed);
-    float tlf = rand(mod(cellPos + vec3(0.0, 1.0, 0.0), scale), seed);
-    float trf = rand(mod(cellPos + vec3(1.0, 1.0, 0.0), scale), seed);
+	float brf = rand(mod(cellPos + vec3(1.0, 0.0, 0.0), scale), seed);
+	float tlf = rand(mod(cellPos + vec3(0.0, 1.0, 0.0), scale), seed);
+	float trf = rand(mod(cellPos + vec3(1.0, 1.0, 0.0), scale), seed);
 	float blb = rand(mod(cellPos + vec3(0.0, 0.0, 1.0), scale), seed);
-    float brb = rand(mod(cellPos + vec3(1.0, 0.0, 1.0), scale), seed);
-    float tlb = rand(mod(cellPos + vec3(0.0, 1.0, 1.0), scale), seed);
-    float trb = rand(mod(cellPos + vec3(1.0, 1.0, 1.0), scale), seed);
+	float brb = rand(mod(cellPos + vec3(1.0, 0.0, 1.0), scale), seed);
+	float tlb = rand(mod(cellPos + vec3(0.0, 1.0, 1.0), scale), seed);
+	float trb = rand(mod(cellPos + vec3(1.0, 1.0, 1.0), scale), seed);
 
 	float botFront = mix(blf, brf, localPos.x);
 	float topFront = mix(tlf, trf, localPos.x);
@@ -96,16 +126,16 @@ float perlin(vec3 p, float scale, float seed)
 	return mix(front, back, localPos.z);
 }
 
-float worly(vec3 p, float scale, float seed)
+float worley(vec3 p, float scale, float seed)
 {
-    float cellSize = 1.0 / scale;
+	float cellSize = 1.0 / scale;
 
-    vec3 cellPos = floor(p / cellSize);
-    vec3 localPos = mod(p, cellSize) * scale;
+	vec3 cellPos = floor(p / cellSize);
+	vec3 localPos = mod(p, cellSize) * scale;
 
-    float minDist = 1.0;
-    for(int i = -1; i <= 1; i++)
-        for(int j = -1; j <= 1; j++)
+	float minDist = 1.0;
+	for(int i = -1; i <= 1; i++)
+		for(int j = -1; j <= 1; j++)
 			for(int k = -1; k <= 1; k++)
 			{
 				vec3 center = rand3(mod(cellPos + vec3(i, j, k), scale), seed);
@@ -116,7 +146,33 @@ float worly(vec3 p, float scale, float seed)
 				minDist = min(minDist, length(diff));
 			}
 
-    return minDist;
+	return minDist;
+}
+
+float worley_box(vec3 p, float scale, float seed)
+{
+	float cellSize = 1.0 / scale;
+
+	vec3 cellPos = floor(p / cellSize);
+	vec3 localPos = mod(p, cellSize) * scale;
+
+	float maxDist = 0.0;
+	for(int i = -1; i <= 1; i++)
+		for(int j = -1; j <= 1; j++)
+			for(int k = -1; k <= 1; k++)
+			{
+				vec3 center = rand3(mod(cellPos + vec3(i, j, k), scale), seed);
+				center += vec3(i, j, k);
+
+				vec3 angle = rand3(mod(cellPos + vec3(i, j, k), scale), -seed) * 2.0 * 3.1415962;
+
+				vec3 diff = center - localPos;
+				float dist = -sdf_box(diff, 1.0, angle);
+
+				maxDist = max(maxDist, dist);
+			}
+
+	return 1.0 - maxDist;
 }
 
 //--------------------------------------------------------------------------------------------------------------------------------//
@@ -124,79 +180,85 @@ float worly(vec3 p, float scale, float seed)
 
 float fbm(vec3 p, uint noiseType, float seed, float startFreq, uint octaves)
 {
-    float freq = startFreq;
-    float amp = 1.0;
-    float mag = 0.0;
+	float freq = startFreq;
+	float amp = 1.0;
+	float mag = 0.0;
 
-    float noise = 0.0;
-    for(int i = 0; i < octaves; i++)
-    {
-        float n;
-        switch(noiseType)
-        {
-        case 0:
-            n = perlin(p, freq, seed);
-            break;
-        case 1:
-            n = worly(p, freq, seed);
-            break;
-        case 2:
-            n = 1.0 - worly(p, freq, seed);
-            break;
-        default:
-            n = 0.0;
-            break;
-        }
+	float noise = 0.0;
+	for(int i = 0; i < octaves; i++)
+	{
+		float n;
+		switch(noiseType)
+		{
+		case 0:
+			n = perlin(p, freq, seed);
+			break;
+		case 1:
+			n = worley(p, freq, seed);
+			break;
+		case 2:
+			n = 1.0 - worley(p, freq, seed);
+			break;
+		case 3:
+			n = worley_box(p, freq, seed);
+			break;
+		case 4:
+			n = 1.0 - worley_box(p, freq, seed);
+			break;
+		default:
+			n = 0.0;
+			break;
+		}
 
-        noise += amp * n;
-        mag += amp;
-        freq *= 2.0;
-        amp *= 0.5;
-    }
+		noise += amp * n;
+		mag += amp;
+		freq *= 2.0;
+		amp *= 0.5;
+	}
 
-    return noise / mag;
+	return noise / mag;
 }
 
 float noise_val(vec3 p, NoiseData data)
 {
-    return fbm(p, data.type, data.seed, data.startFreq, data.octaves);
+	return fbm(p, data.type, data.seed, data.startFreq, data.octaves);
 }
 
 vec4 noise_tex(vec3 p, NoiseData r, NoiseData g, NoiseData b, NoiseData a)
 {
-    return vec4(noise_val(p, r), noise_val(p, g), noise_val(p, b), noise_val(p, a));
+	return vec4(noise_val(p, r), noise_val(p, g), noise_val(p, b), noise_val(p, a));
 }
 
 //--------------------------------------------------------------------------------------------------------------------------------//
 
 void main()
 {
-    ivec3 texSize = imageSize(outImage);
-    ivec3 texPos = ivec3(gl_GlobalInvocationID.xyz);
-    if(texPos.x >= texSize.x || texPos.y >= texSize.y || texPos.z >= texSize.z)
-        return;
+	ivec3 texSize = imageSize(outImage);
+	ivec3 texPos = ivec3(gl_GlobalInvocationID.xyz);
+	if(texPos.x >= texSize.x || texPos.y >= texSize.y || texPos.z >= texSize.z)
+		return;
 
-    vec3 posNorm = vec3(texPos) / vec3(texSize);
-    vec4 primaryCol = noise_tex(posNorm, primaryR, primaryG, primaryB, primaryA);
-    vec4 layeredCol = noise_tex(posNorm, layeredR, layeredG, layeredB, layeredA);
-    vec4 finalCol;
+	vec3 posNorm = vec3(texPos) / vec3(texSize);
+	vec4 primaryCol = noise_tex(posNorm, primaryR, primaryG, primaryB, primaryA);
+	vec4 layeredCol = noise_tex(posNorm, layeredR, layeredG, layeredB, layeredA);
+	vec4 finalCol;
 
-    switch(layeringType)
-    {
-    case 0:
-        finalCol = primaryCol;
-        break;
-    case 1:
-        finalCol = primaryCol * layeredCol;
-        break;
-    case 2:
-        finalCol = 0.5 * (primaryCol + layeredCol);
-        break;
-    default:
-        finalCol = vec4(0.0);
-        break;
-    }
+	switch(layeringType)
+	{
+	case 0:
+		finalCol = primaryCol;
+		break;
+	case 1:
+		finalCol = primaryCol * layeredCol;
+		break;
+	case 2:
+		finalCol = 0.5 * (primaryCol + layeredCol);
+		break;
+	default:
+		finalCol = vec4(0.0);
+		break;
+	}
 
-    //store final color:
-    imageStore(outImage, texPos, finalCol);
+	//store final color:
+	imageStore(outImage, texPos, finalCol);
 }

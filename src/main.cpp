@@ -19,7 +19,7 @@ GLuint g_windowH = 1600;
 
 struct NoiseData
 {
-	GLuint type; //0 = perlin, 1 = worly
+	GLuint type; //0 = perlin, 1 = worley, 3 = worley box, 4 = worley box (inverted)
 	float seed;
 
 	float startFreq;
@@ -437,8 +437,8 @@ void render_noise_ui(NoiseData* data, bool primary)
 
 	ImGui::PushItemWidth(ImGui::GetWindowSize().x * 0.5f);
 
-	const char* noiseNames[3] = {"Perlin", "Worly", "Worly (Inverted)"};
-	ImGui::Combo("Noise Type", (int*)&data->type, noiseNames, 3);
+	const char* noiseNames[5] = {"Perlin", "Worley", "Worley (Inverted)", "Worley Box", "Worley Box (inverted)"};
+	ImGui::Combo("Noise Type", (int*)&data->type, noiseNames, 5);
 	
 	ImGui::InputFloat("Seed", &data->seed, 1.0f, 10.0f);
 

@@ -4,7 +4,8 @@ NoiseToy is a very primitive library for dynamically generating various types of
 
 ## Features
 * Perlin noise
-* Worly noise
+* Worley noise
+* Worley-box noise (variation on worley I developed, uses a box SDF instead of a circle)
 * Ability to have different noise types/parameters in each channel
 * Ability to layer different noise types in a single channel
 * Exporting (to an uncompressed mem dump)
